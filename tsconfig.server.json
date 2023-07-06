@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "ESNext",
+    "outDir": "dist",
+    "noEmit": false,
+  },
+  "include": ["server"]
+}
