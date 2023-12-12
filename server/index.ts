@@ -9,13 +9,19 @@ import next from 'next';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
+import { Server } from 'socket.io';
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
+
 import RedisServer from './services/redis';
+import userRouter from './routers/user.route';
 
 dotenv.config();
 
-const { PORT, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS } = process.env;
+const { PORT, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, NODE_ENV } = process.env;
 
-const dev = true;
+const dev = NODE_ENV === 'development';
+console.log(dev)
 function resolve(p: string) {
   return path.resolve(__dirname, p);
 }
@@ -24,14 +30,28 @@ const handle = app.getRequestHandler();
 
 const connectString = `mongodb://${DB_HOST}:${DB_PORT}/${DB_NAME}?authSource=admin`;
 
-const options = {
-  key: fs.readFileSync('localhost.key'),
-  cert: fs.readFileSync('localhost.crt')
-};
+const httpsOptions = {
+  key: fs.readFileSync('./certification/cert.key'),
+  cert: fs.readFileSync('./certification/cert.pem')
+  }
 
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const server = express();
+  const httpsServer = https.createServer(httpsOptions, server)
+  const io = new Server(httpsServer);
+  const pubClient = createClient({ url: "redis://localhost:6379" });
+  const subClient = pubClient.duplicate();
+  await Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+    io.adapter(createAdapter(pubClient, subClient));
+  });
+
+  io.on("connection", (socket) => {
+    console.log("Client id connected "+socket.id)
+    socket.on('message', msg => {
+      io.send(socket.id+': '+msg);
+    })
+  });
   if (dev) {
     server.use(morgan('dev'));
   } else {
@@ -52,20 +72,18 @@ app.prepare().then(() => {
       pass: DB_PASS,
       maxPoolSize: 50,
     })
-  // routes
   RedisServer.getInstance();
+  // routes
   server.use(express.static(path.join(__dirname, 'public')));
-
-
+  server.use(userRouter)
+  
   server.all('*', (req, res) => {
     return handle(req, res);
   });
 
-  server.listen(PORT, () => {
-    console.log(`Server is started: http://localhost:${PORT}`);
+
+  httpsServer.listen(PORT, () => {
+    console.log(`Server is started: https://localhost:${PORT}`);
   });
   
-  https.createServer(options, server).listen(PORT, () => {
-    console.log(`Server is started: http://localhost:${PORT}`);
-  });
 });

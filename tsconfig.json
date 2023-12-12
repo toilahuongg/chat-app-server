@@ -16,7 +16,7 @@
     "incremental": true,
     "paths": {
       "@src/*": ["./src/*"],
-      "@server/*": ["./server/*"],
+      "@server/*": ["./server/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],

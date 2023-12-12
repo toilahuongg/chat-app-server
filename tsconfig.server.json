@@ -4,7 +4,7 @@
     "module": "nodenext",
     "target": "ESNext",
     "outDir": "dist",
-    "noEmit": false,
+    "noEmit": false
   },
   "include": ["server"]
 }
